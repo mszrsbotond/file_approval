@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(python3 -V)",
+      "Read(//home/mszrsbotond/**)",
+      "Bash(command -v npm)",
+      "Bash(command -v docker)",
+      "Bash(docker -v)",
+      "Bash(npm run *)",
+      "Bash(docker compose *)",
+      "Bash(git *)"
+    ]
+  }
+}

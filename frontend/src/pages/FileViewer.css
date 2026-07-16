@@ -1,0 +1,219 @@
+.viewer-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--color-bg);
+}
+
+.viewer-header {
+  flex-shrink: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+}
+
+.viewer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Toolbar: reserved space for future annotation/comment controls */
+.viewer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewer-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  background: #2a2f3a;
+  padding: 24px;
+}
+
+/* margin: auto (not align-items/justify-content: center) so that content taller/wider
+   than the viewport stays fully scrollable instead of having its start edge clipped —
+   centering via flex align/justify makes the overflowing start side unreachable. */
+.viewer-content > .annotation-stage,
+.viewer-content > .viewer-pdf-wrap,
+.viewer-content > .viewer-fallback {
+  margin: auto;
+}
+
+.viewer-content iframe {
+  border: none;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+.viewer-image {
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: var(--shadow-md);
+  background: #fff;
+}
+
+.viewer-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+  text-align: center;
+}
+
+.viewer-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.viewer-send-error {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-danger);
+  white-space: nowrap;
+}
+
+.viewer-feedback-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewer-feedback-input {
+  width: 280px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.viewer-pdf-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.viewer-pdf-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 13px;
+}
+
+.viewer-pdf-status {
+  color: #fff;
+  padding: 40px;
+}
+
+/* Annotation stage: relative wrapper that shrink-wraps exactly to the rendered
+   image/PDF page, so the absolutely-positioned overlay always matches its size. */
+.annotation-stage {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  box-shadow: var(--shadow-md);
+  background: #fff;
+}
+
+.annotation-stage img,
+.annotation-stage canvas {
+  display: block;
+}
+
+.annotation-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.annotation-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.annotation-pin--number {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.annotation-popover,
+.annotation-bubble {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 16px));
+  z-index: 3;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 12px;
+  width: 120px;
+  line-height: 1.4;
+}
+
+/* Ha a pin túl közel van a stage tetejéhez, a felfelé nyíló popover/bubble
+   kilógna a görgethető területről (nem lehetne felgörgetni hozzá) — ilyenkor lefelé nyílik. */
+.annotation-popover--below,
+.annotation-bubble--below {
+  transform: translate(-50%, 16px);
+}
+
+.annotation-bubble p {
+  justify-content: center;
+  text-align: center;
+  margin: 0 0 0px;
+  font-size: 16px;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.annotation-bubble-delete {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.annotation-popover textarea {
+  width: 100%;
+  margin-bottom: 8px;
+  resize: vertical;
+}
+
+.annotation-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
