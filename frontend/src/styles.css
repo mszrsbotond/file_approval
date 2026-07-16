@@ -163,6 +163,10 @@ a:hover {
   gap: 24px;
 }
 
+.app-container--wide {
+  max-width: none;
+}
+
 .app-back-link {
   display: inline-flex;
   align-items: center;
@@ -211,6 +215,37 @@ a:hover {
 .card-title {
   font-size: 16px;
   margin: 0 0 18px;
+}
+
+/* Kanban dashboard */
+
+.cards-kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .cards-kanban {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kanban-column--pending {
+  background: var(--color-pending-soft);
+}
+
+.kanban-column--changes {
+  background: var(--color-danger-soft);
+}
+
+.kanban-column--approved {
+  background: var(--color-success-soft);
+}
+
+.kanban-column .order-row {
+  background: var(--color-surface);
 }
 
 /* Form elements */
@@ -598,6 +633,18 @@ a:hover {
   line-height: 1.5;
 }
 
+.version-feedback-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.version-feedback-line svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--color-primary);
+}
+
 .version-review-summary strong {
   color: var(--color-primary);
   font-weight: 600;
@@ -663,16 +710,6 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.version-file-open {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.version-file-open:hover {
-  color: var(--color-primary);
 }
 
 .version-annotation-count {

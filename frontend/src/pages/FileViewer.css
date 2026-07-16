@@ -334,6 +334,18 @@
   margin: 0;
 }
 
+.sidebar-feedback-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sidebar-feedback-line svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding: 20px;

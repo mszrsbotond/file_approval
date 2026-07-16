@@ -20,6 +20,14 @@ function getExtension(name) {
   return parts.length > 1 ? parts.pop().toLowerCase() : ''
 }
 
+function CommentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
 function FileViewer() {
   const { orderId, versionId, filename: encodedFilename } = useParams()
   const [searchParams] = useSearchParams()
@@ -404,7 +412,10 @@ function FileViewer() {
               </h3>
               {renderCommentList(false)}
               {versionData?.feedback && (
-                <p className="sidebar-hint">{versionData.feedback}</p>
+                <p className="sidebar-hint sidebar-feedback-line">
+                  <CommentIcon />
+                  {versionData.feedback}
+                </p>
               )}
             </div>
           ) : (

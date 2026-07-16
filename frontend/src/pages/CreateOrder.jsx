@@ -60,13 +60,7 @@ function CreateOrder() {
 
       if (response.ok) {
         const data = await response.json()
-        setOrderMessage(`Rendelés létrehozva: ${data.order_number}`)
-        setSelectedCustomerId(NEW_CUSTOMER_VALUE)
-        setCustomerName('')
-        setCustomerEmail('')
-        setProductName('')
-        fetchCustomers()
-        navigate('/admin')
+        navigate(`/admin/orders/${data.order_id}`)
       } else if (response.status === 401) {
         setOrderMessage('Nincs bejelentkezve')
       } else {

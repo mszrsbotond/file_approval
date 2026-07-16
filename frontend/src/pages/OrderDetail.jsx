@@ -2,6 +2,23 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout.jsx'
 
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function CommentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
 function OrderDetail() {
   const { orderId } = useParams()
 
@@ -207,7 +224,7 @@ function OrderDetail() {
                         ? 'Jóváhagyva'
                         : version.status === 'changes_requested'
                         ? 'Javítás kérve'
-                        : 'Függőben'}
+                        : 'Jóváhagyásra vár'}
                     </span>
                     <a
                       className="version-download"
@@ -230,11 +247,12 @@ function OrderDetail() {
                         {filename.includes('_') ? filename.split('_').slice(1).join('_') : filename}
                       </a>
                       <a
-                        className="version-file-open"
+                        className="btn btn-secondary btn-sm version-file-open"
                         href={`/viewer/${orderId}/${version.version_id}/${encodeURIComponent(filename)}?mode=view`}
                         target="_blank"
                         rel="noreferrer"
                       >
+                        <EyeIcon />
                         Megnyitás
                       </a>
                     </li>
@@ -243,7 +261,12 @@ function OrderDetail() {
 
                 {version.status !== 'pending' && (
                   <div className="version-review-summary">
-                    {version.feedback && <p>Visszajelzés: {version.feedback}</p>}
+                    {version.feedback && (
+                      <p className="version-feedback-line">
+                        <CommentIcon />
+                        {version.feedback}
+                      </p>
+                    )}
                     {(responseFiles[version.version_id] || []).length > 0 && (
                       <>
                         <p>Ügyfél által csatolt fájlok:</p>
