@@ -246,18 +246,25 @@ function OrderDetail() {
                       >
                         {filename.includes('_') ? filename.split('_').slice(1).join('_') : filename}
                       </a>
-                      <a
-                        className="btn btn-secondary btn-sm version-file-open"
-                        href={`/viewer/${orderId}/${version.version_id}/${encodeURIComponent(filename)}?mode=view`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <EyeIcon />
-                        Megnyitás
-                      </a>
                     </li>
                   ))}
                 </ul>
+
+                {(versionFiles[version.version_id] || []).length > 0 && (
+                  <div className="version-open-panel">
+                    <a
+                      className="btn btn-primary version-open-btn"
+                      href={`/viewer/${orderId}/${version.version_id}/${encodeURIComponent(
+                        versionFiles[version.version_id][0],
+                      )}?mode=view`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <EyeIcon />
+                      Megnyitás
+                    </a>
+                  </div>
+                )}
 
                 {version.status !== 'pending' && (
                   <div className="version-review-summary">

@@ -1,6 +1,6 @@
 import './FileViewer.css'
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -31,6 +31,7 @@ function CommentIcon() {
 function FileViewer() {
   const { orderId, versionId, filename: encodedFilename } = useParams()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const readonly = searchParams.get('mode') === 'view'
 
   const filename = decodeURIComponent(encodedFilename)
@@ -63,6 +64,18 @@ function FileViewer() {
   const [sendError, setSendError] = useState(null)
 
   const [versionData, setVersionData] = useState(null)
+
+  // A verzióhoz tartozó összes fájl, hogy a fejlécben lehessen köztük váltani
+  // (egy verzióben egyszerre több fájl is érkezhet, nem csak az, amivel a
+  // Megnyitás gomb elsőként megnyitotta a viewert).
+  const [allFiles, setAllFiles] = useState([])
+  const currentFileIndex = allFiles.indexOf(filename)
+
+  // Az összes fájl összes pinjének száma a verzióban — az Elfogadás csak akkor
+  // engedhető meg, ha SEHOL nincs pin, nem csak az épp megnyitott fájlon,
+  // különben fájlváltás után úgy lehetne elfogadni, hogy egy másik fájlon
+  // közben már javítást kértek.
+  const [totalAnnotationCount, setTotalAnnotationCount] = useState(0)
 
   // PDF oldal szélessége a rendelkezésre álló hely alapján, hogy az overlay pontosan
   // a ténylegesen renderelt lap méretéhez igazodjon (a stage shrink-wrap-eli a lapot).
@@ -120,6 +133,89 @@ function FileViewer() {
     if (!activePinId) return
     document.getElementById(`comment-${activePinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [activePinId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchAllFiles = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/orders/${orderId}/versions/${versionId}/files`)
+        if (response.ok && !cancelled) {
+          const data = await response.json()
+          const sorted = [...data.files].sort((a, b) => {
+            const nameA = a.includes('_') ? a.split('_').slice(1).join('_') : a
+            const nameB = b.includes('_') ? b.split('_').slice(1).join('_') : b
+            return nameA.localeCompare(nameB)
+          })
+          setAllFiles(sorted)
+        }
+      } catch (error) {
+        // hiba esetén a fájlváltó nem jelenik meg
+      }
+    }
+
+    fetchAllFiles()
+    return () => {
+      cancelled = true
+    }
+  }, [orderId, versionId])
+
+  const switchFile = (delta) => {
+    const newIndex = currentFileIndex + delta
+    if (newIndex < 0 || newIndex >= allFiles.length) return
+
+    setNewPinDraft(null)
+    setDraftComment('')
+    setActivePinId(null)
+    setCurrentPage(1)
+    setNumPages(0)
+
+    const newFilename = allFiles[newIndex]
+    navigate(
+      `/viewer/${orderId}/${versionId}/${encodeURIComponent(newFilename)}${readonly ? '?mode=view' : ''}`,
+      { replace: true },
+    )
+  }
+
+  // A teljes verzió összes fájljának pin-száma — nem csak az épp látott fájlé —,
+  // hogy az Elfogadás ne legyen elérhető, ha bárhol máshol már van megjegyzés.
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchTotalAnnotationCount = async () => {
+      if (allFiles.length === 0) return
+      try {
+        const counts = await Promise.all(
+          allFiles.map(async (f) => {
+            const response = await fetch(
+              `${API_BASE}/orders/${orderId}/versions/${versionId}/annotations?filename=${encodeURIComponent(f)}`,
+            )
+            if (!response.ok) return 0
+            const data = await response.json()
+            return data.length
+          }),
+        )
+        if (!cancelled) {
+          setTotalAnnotationCount(counts.reduce((sum, count) => sum + count, 0))
+        }
+      } catch (error) {
+        // hiba esetén a régi összesítés marad
+      }
+    }
+
+    fetchTotalAnnotationCount()
+    return () => {
+      cancelled = true
+    }
+  }, [orderId, versionId, allFiles, annotations])
+
+  // Ha időközben (pl. fájlváltás után) máshol pin került fel, az Elfogadás már
+  // nem érvényes döntés — visszaállunk, hogy a felhasználó újra válasszon.
+  useEffect(() => {
+    if (decision === 'accept' && totalAnnotationCount > 0) {
+      setDecision(null)
+    }
+  }, [totalAnnotationCount, decision])
 
   const currentPageNumber = isPdf ? currentPage : 1
   const pinsForCurrentPage = annotations.filter((a) => a.page_number === currentPageNumber)
@@ -207,7 +303,7 @@ function FileViewer() {
 
   const canSend =
     decision === 'accept' ||
-    (decision === 'feedback' && (generalNote.trim() !== '' || annotations.length > 0))
+    (decision === 'feedback' && (generalNote.trim() !== '' || totalAnnotationCount > 0))
 
   const handleSend = async () => {
     if (!canSend || sending || sent) return
@@ -330,7 +426,34 @@ function FileViewer() {
   return (
     <div className="viewer-shell">
       <header className="viewer-header">
-        <span className="viewer-title">{displayName}</span>
+        <div className="viewer-header-title">
+          <span className="viewer-title">{displayName}</span>
+          {allFiles.length > 1 && (
+            <div className="viewer-file-switcher">
+              <button
+                type="button"
+                className="viewer-file-switcher-btn"
+                onClick={() => switchFile(-1)}
+                disabled={currentFileIndex <= 0}
+                aria-label="Előző fájl"
+              >
+                &larr;
+              </button>
+              <span>
+                {currentFileIndex + 1} / {allFiles.length} fájl
+              </span>
+              <button
+                type="button"
+                className="viewer-file-switcher-btn"
+                onClick={() => switchFile(1)}
+                disabled={currentFileIndex >= allFiles.length - 1}
+                aria-label="Következő fájl"
+              >
+                &rarr;
+              </button>
+            </div>
+          )}
+        </div>
         {readonly && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.close()}>
             Bezárás
@@ -421,21 +544,15 @@ function FileViewer() {
           ) : (
             <>
               <div className="sidebar-section sidebar-decision">
-                {annotations.length === 0 ? (<button
+                <button
                   type="button"
                   className={`sidebar-decision-btn sidebar-decision-btn--accept${decision === 'accept' ? ' active' : ''}`}
                   onClick={() => setDecision('accept')}
-                  disabled={sent}
+                  disabled={sent || totalAnnotationCount > 0}
+                  title={totalAnnotationCount > 0 ? 'Nem fogadható el, amíg bármelyik fájlon megjegyzés van' : undefined}
                 >
                   ✓ Elfogadás
-                </button>) : (<button
-                  type="button"
-                  className={`sidebar-decision-btn sidebar-decision-btn--accept${decision === 'accept' ? ' active' : ''}`}
-                  onClick={() => setDecision('accept')}
-                  disabled={true}
-                >
-                  ✓ Elfogadás
-                </button>)}
+                </button>
                 <button
                   type="button"
                   className={`sidebar-decision-btn sidebar-decision-btn--feedback${decision === 'feedback' ? ' active' : ''}`}
