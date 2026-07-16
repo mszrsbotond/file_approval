@@ -29,11 +29,11 @@
   white-space: nowrap;
 }
 
-/* Toolbar: reserved space for future annotation/comment controls */
-.viewer-toolbar {
+.viewer-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
 }
 
 .viewer-content {
@@ -54,12 +54,6 @@
   margin: auto;
 }
 
-.viewer-content iframe {
-  border: none;
-  background: #fff;
-  box-shadow: var(--shadow-md);
-}
-
 .viewer-image {
   max-width: 100%;
   max-height: 100%;
@@ -74,31 +68,6 @@
   gap: 16px;
   color: #fff;
   text-align: center;
-}
-
-.viewer-hint {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.viewer-send-error {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-danger);
-  white-space: nowrap;
-}
-
-.viewer-feedback-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.viewer-feedback-input {
-  width: 280px;
-  padding: 7px 12px;
-  font-size: 13px;
 }
 
 .viewer-pdf-wrap {
@@ -155,6 +124,12 @@
   justify-content: center;
   cursor: pointer;
   z-index: 2;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.annotation-pin--active {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.35), 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
 .annotation-pin--number {
@@ -164,8 +139,7 @@
   line-height: 1;
 }
 
-.annotation-popover,
-.annotation-bubble {
+.annotation-popover {
   position: absolute;
   transform: translate(-50%, calc(-100% - 16px));
   z-index: 3;
@@ -174,36 +148,14 @@
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   padding: 12px;
-  width: 120px;
+  width: 220px;
   line-height: 1.4;
 }
 
-/* Ha a pin túl közel van a stage tetejéhez, a felfelé nyíló popover/bubble
-   kilógna a görgethető területről (nem lehetne felgörgetni hozzá) — ilyenkor lefelé nyílik. */
-.annotation-popover--below,
-.annotation-bubble--below {
+/* Ha a pin túl közel van a stage tetejéhez, a felfelé nyíló popover kilógna a görgethető
+   területről (nem lehetne felgörgetni hozzá) — ilyenkor lefelé nyílik. */
+.annotation-popover--below {
   transform: translate(-50%, 16px);
-}
-
-.annotation-bubble p {
-  justify-content: center;
-  text-align: center;
-  margin: 0 0 0px;
-  font-size: 16px;
-  color: var(--color-text);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.annotation-bubble-delete {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-danger);
-  background: var(--color-danger-soft);
-  border: none;
-  border-radius: var(--radius-full);
-  padding: 5px 12px;
-  cursor: pointer;
 }
 
 .annotation-popover textarea {
@@ -216,4 +168,194 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* Sidebar */
+
+.viewer-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar-decision {
+  display: flex;
+  gap: 10px;
+}
+
+.sidebar-decision-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-decision-btn:hover:not(:disabled) {
+  border-color: var(--color-text-faint);
+}
+
+.sidebar-decision-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sidebar-decision-btn--accept.active {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.sidebar-decision-btn--feedback.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin: 0 0 12px;
+}
+
+.sidebar-comment-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-empty {
+  font-size: 13px;
+  color: var(--color-text-faint);
+  line-height: 1.5;
+}
+
+.sidebar-comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid transparent;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.sidebar-comment:hover {
+  border-color: var(--color-border);
+}
+
+.sidebar-comment--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.sidebar-comment-number {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.sidebar-comment-text {
+  flex: 1;
+  line-height: 1.45;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.sidebar-comment-page {
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.sidebar-comment-delete {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.sidebar-comment-delete:hover {
+  color: var(--color-danger);
+}
+
+.sidebar-general-toggle {
+  width: 100%;
+}
+
+.sidebar-general-textarea {
+  min-height: 80px;
+}
+
+.sidebar-hint {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-footer .btn {
+  width: 100%;
+}
+
+.sidebar-error {
+  font-size: 13px;
+  color: var(--color-danger);
+  margin: 0;
+}
+
+.sidebar-success {
+  font-size: 13px;
+  color: var(--color-success);
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
 }

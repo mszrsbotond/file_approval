@@ -199,7 +199,7 @@ class DBManager():
 
     def get_version_by_id(self, version_id):
         query = """
-            SELECT version_id, order_id, version_number, pdf_path, status, created_at
+            SELECT version_id, order_id, version_number, pdf_path, status, created_at, feedback
             FROM versions
             WHERE version_id = %s
         """
@@ -281,7 +281,7 @@ def send_approval_email(to_email: str, customer_name: str, link: str, order_numb
 
 def send_response_email(link: str, product_name: str, response_status: str, response_message: str, customer_email: str):
     body = (
-        f"{response_message}"
+        f"{response_message}\n"
         f"Kérjük, ellenőrizze és hagyja jóvá az alábbi linken:\n\n{link}\n\n"
     )
     
@@ -485,6 +485,23 @@ def list_versions(order_id: str):
     ]
 
 
+@app.get("/orders/{order_id}/versions/{version_id}")
+def get_version(order_id: str, version_id: str):
+    version = DBMan.get_version_by_id(version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="A verzió nem található")
+
+    return {
+        "version_id": version[0],
+        "order_id": version[1],
+        "version_number": version[2],
+        "pdf_path": version[3],
+        "status": version[4],
+        "created_at": version[5],
+        "feedback": version[6],
+    }
+
+
 @app.get("/orders/{order_id}/versions/{version_id}/files")
 def list_version_files(order_id: str, version_id: str):
     version_dir = UPLOAD_DIR / version_id
@@ -651,11 +668,10 @@ async def customer_feedback(
 
     link = f"{os.environ['FRONTEND_BASE_URL']}/admin/orders/{order_id}"
 
+    DBMan.add_response(version_id, status, message)
+
     try:
         send_response_email(link, product_name, status, message, customer_email)
-        DBMan.add_response(version_id, status, message)
-
-
     except Exception as e:
         print(f"Válasz email küldése sikertelen: {e}")
 

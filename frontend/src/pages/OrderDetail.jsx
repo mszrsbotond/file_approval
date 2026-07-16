@@ -176,7 +176,7 @@ function OrderDetail() {
                 value={emailMessage}
                 onChange={(e) => setEmailMessage(e.target.value)}
           />}
-            <button type="submit" className="btn btn-primary" disabled={files.length === 0 || uploading}>
+            <button type="submit" className="btn btn-primary" disabled={files.length === 0 || uploading || chosenEmailMessage === ""}>
               {uploading ? 'Feltöltés...' : 'Új verzió feltöltése'}
             </button>
           </form>

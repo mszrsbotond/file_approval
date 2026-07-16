@@ -12,7 +12,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 const API_BASE = 'http://localhost:8000'
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
-// Ha a kattintás ennél kevesebb pixelre van a stage tetejétől, a popover/bubble lefelé nyílik felfelé helyett.
+// Ha a kattintás ennél kevesebb pixelre van a stage tetejétől, az új pin popover-je lefelé nyílik felfelé helyett.
 const POPOVER_FLIP_THRESHOLD = 190
 
 function getExtension(name) {
@@ -45,12 +45,16 @@ function FileViewer() {
   const [draftComment, setDraftComment] = useState('')
   const [savingPin, setSavingPin] = useState(false)
   const [activePinId, setActivePinId] = useState(null)
-  const [activePinFlip, setActivePinFlip] = useState(false)
 
-  const [feedbackMessage, setFeedbackMessage] = useState('')
+  // Elfogadás/Visszajelzés döntés + az ehhez tartozó általános (ponthoz nem kötött) üzenet
+  const [decision, setDecision] = useState(null) // null | 'accept' | 'feedback'
+  const [showGeneralNote, setShowGeneralNote] = useState(false)
+  const [generalNote, setGeneralNote] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [sendError, setSendError] = useState(null)
+
+  const [versionData, setVersionData] = useState(null)
 
   // PDF oldal szélessége a rendelkezésre álló hely alapján, hogy az overlay pontosan
   // a ténylegesen renderelt lap méretéhez igazodjon (a stage shrink-wrap-eli a lapot).
@@ -85,11 +89,29 @@ function FileViewer() {
       }
     }
 
+    const fetchVersion = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/orders/${orderId}/versions/${versionId}`)
+        if (response.ok && !cancelled) {
+          setVersionData(await response.json())
+        }
+      } catch (error) {
+        // hiba esetén a verzió adatai üresen maradnak
+      }
+    }
+
     fetchAnnotations()
+    fetchVersion()
     return () => {
       cancelled = true
     }
   }, [orderId, versionId, filename])
+
+  // Ha egy pin aktívvá válik, görgessük láthatóvá az oldalsávban.
+  useEffect(() => {
+    if (!activePinId) return
+    document.getElementById(`comment-${activePinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [activePinId])
 
   const currentPageNumber = isPdf ? currentPage : 1
   const pinsForCurrentPage = annotations.filter((a) => a.page_number === currentPageNumber)
@@ -102,19 +124,16 @@ function FileViewer() {
   const changePage = (delta) => {
     setCurrentPage((page) => Math.min(Math.max(1, page + delta), numPages || 1))
     setNewPinDraft(null)
-    setActivePinId(null)
   }
 
   const handleStageClick = (e) => {
-    if (readonly) return
+    if (readonly || sent) return
     const rect = e.currentTarget.getBoundingClientRect()
     const offsetX = e.clientX - rect.left
     const offsetY = e.clientY - rect.top
     const x = offsetX / rect.width
     const y = offsetY / rect.height
     const flip = offsetY < POPOVER_FLIP_THRESHOLD
-    setActivePinId(null)
-    setDraftComment('')
     setNewPinDraft({ x, y, flip })
   }
 
@@ -147,6 +166,8 @@ function FileViewer() {
         setAnnotations((prev) => [...prev, created])
         setNewPinDraft(null)
         setDraftComment('')
+        setDecision('feedback')
+        setActivePinId(created.annotation_id)
       }
     } catch (error) {
       // hiba esetén a popover nyitva marad, a felhasználó újra próbálhatja
@@ -163,38 +184,40 @@ function FileViewer() {
       )
       if (response.ok) {
         setAnnotations((prev) => prev.filter((a) => a.annotation_id !== annotationId))
-        setActivePinId(null)
+        setActivePinId((prev) => (prev === annotationId ? null : prev))
       }
     } catch (error) {
       // hiba esetén a pin a listában marad
     }
   }
 
-  const handleSend = async (e) => {
-    e.preventDefault()
-    if (sending || sent) return
+  const handlePinClick = (pin) => {
+    setNewPinDraft(null)
+    if (!readonly) setDecision('feedback')
+    setActivePinId(pin.annotation_id)
+  }
 
+  const canSend =
+    decision === 'accept' ||
+    (decision === 'feedback' && (generalNote.trim() !== '' || annotations.length > 0))
+
+  const handleSend = async () => {
+    if (!canSend || sending || sent) return
     setSending(true)
     setSendError(null)
 
-    const trimmedMessage = feedbackMessage.trim()
-    const status = trimmedMessage ? 'changes_requested' : 'approved'
-
+    const status = decision === 'accept' ? 'approved' : 'changes_requested'
     const formData = new FormData()
     formData.append('status', status)
-    formData.append('message', trimmedMessage)
+    formData.append('message', generalNote.trim())
 
     try {
-      const response = await fetch(
-        `${API_BASE}/review/${orderId}/${versionId}/feedback`,
-        {
-          method: 'POST',
-          body: formData,
-        },
-      )
+      const response = await fetch(`${API_BASE}/review/${orderId}/${versionId}/feedback`, {
+        method: 'POST',
+        body: formData,
+      })
       if (response.ok) {
         setSent(true)
-        setTimeout(() => window.close(), 1200)
       } else {
         setSendError('Hiba történt, próbálja újra')
       }
@@ -209,43 +232,21 @@ function FileViewer() {
     <div
       className="annotation-overlay"
       ref={overlayRef}
-      style={{ cursor: readonly ? 'default' : 'crosshair' }}
+      style={{ cursor: readonly || sent ? 'default' : 'crosshair' }}
       onClick={handleStageClick}
     >
       {pinsForCurrentPage.map((pin, index) => (
-        <div key={pin.annotation_id}>
-          <div
-            className="annotation-pin"
-            style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
-            onClick={(e) => {
-              e.stopPropagation()
-              setNewPinDraft(null)
-              const overlayHeight = overlayRef.current?.getBoundingClientRect().height || 0
-              setActivePinFlip(pin.y * overlayHeight < POPOVER_FLIP_THRESHOLD)
-              setActivePinId((prev) => (prev === pin.annotation_id ? null : pin.annotation_id))
-            }}
-          >
-            <span className="annotation-pin--number">{index + 1}</span>
-          </div>
-
-          {activePinId === pin.annotation_id && (
-            <div
-              className={`annotation-bubble${activePinFlip ? ' annotation-bubble--below' : ''}`}
-              style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p>{pin.comment}</p>
-              {!readonly && (
-                <button
-                  type="button"
-                  className="annotation-bubble-delete"
-                  onClick={() => handleDeletePin(pin.annotation_id)}
-                >
-                  Törlés
-                </button>
-              )}
-            </div>
-          )}
+        <div
+          key={pin.annotation_id}
+          className={`annotation-pin${activePinId === pin.annotation_id ? ' annotation-pin--active' : ''}`}
+          style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
+          title={pin.comment}
+          onClick={(e) => {
+            e.stopPropagation()
+            handlePinClick(pin)
+          }}
+        >
+          <span className="annotation-pin--number">{index + 1}</span>
         </div>
       ))}
 
@@ -281,103 +282,222 @@ function FileViewer() {
     </div>
   )
 
+  const renderCommentList = (deletable) => (
+    <ul className="sidebar-comment-list">
+      {annotations.length === 0 && (
+        <li className="sidebar-empty">
+          {deletable ? 'Kattintson a fájlra egy pont kijelöléséhez.' : 'Nincs megjegyzés ehhez a fájlhoz.'}
+        </li>
+      )}
+      {annotations.map((pin, index) => (
+        <li
+          key={pin.annotation_id}
+          id={`comment-${pin.annotation_id}`}
+          className={`sidebar-comment${activePinId === pin.annotation_id ? ' sidebar-comment--active' : ''}`}
+          onClick={() => handlePinClick(pin)}
+        >
+          <span className="sidebar-comment-number">{index + 1}</span>
+          <span className="sidebar-comment-text">
+            {pin.comment}
+            {isPdf && <span className="sidebar-comment-page"> · {pin.page_number}. oldal</span>}
+          </span>
+          {deletable && (
+            <button
+              type="button"
+              className="sidebar-comment-delete"
+              aria-label="Törlés"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDeletePin(pin.annotation_id)
+              }}
+            >
+              ×
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+
   return (
     <div className="viewer-shell">
       <header className="viewer-header">
         <span className="viewer-title">{displayName}</span>
-        <div className="viewer-toolbar">
-          {!readonly && (isImage || isPdf) && (
-            <span className="viewer-hint">Kattintson a fájlra megjegyzés hozzáadásához</span>
-          )}
-          {readonly && <span className="viewer-hint">Csak megtekintés</span>}
-          {sendError && <span className="viewer-send-error">{sendError}</span>}
-
-          {readonly ? (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.close()}>
-              Bezárás
-            </button>
-          ) : (
-            <form className="viewer-feedback-form" onSubmit={handleSend}>
-              <input
-                type="text"
-                className="input viewer-feedback-input"
-                placeholder="Visszajelzés (üresen hagyva = elfogadás)"
-                value={feedbackMessage}
-                onChange={(e) => setFeedbackMessage(e.target.value)}
-                disabled={sending || sent}
-              />
-              <button type="submit" className="btn btn-primary btn-sm" disabled={sending || sent}>
-                {sent ? 'Elküldve ✓' : sending ? 'Küldés...' : 'Küldés'}
-              </button>
-            </form>
-          )}
-        </div>
+        {readonly && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.close()}>
+            Bezárás
+          </button>
+        )}
       </header>
 
-      <main className="viewer-content" ref={contentRef}>
-        {isImage && (
-          <div className="annotation-stage">
-            <img className="viewer-image" src={viewUrl} alt={displayName} draggable={false} />
-            {renderOverlay()}
-          </div>
-        )}
-
-        {isPdf && (
-          <div className="viewer-pdf-wrap">
+      <div className="viewer-body">
+        <main className="viewer-content" ref={contentRef}>
+          {isImage && (
             <div className="annotation-stage">
-              <Document
-                file={viewUrl}
-                onLoadSuccess={handleDocumentLoadSuccess}
-                loading={<p className="viewer-pdf-status">Betöltés...</p>}
-                error={<p className="viewer-pdf-status">A PDF nem tölthető be</p>}
-              >
-                {/* text/annotation layer nélkül, mert azok a canvas fölé kerülnek és
-                    elnyelnék a kattintásokat az annotation-overlay elől */}
-                <Page
-                  pageNumber={currentPage}
-                  width={pageWidth}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                />
-              </Document>
+              <img className="viewer-image" src={viewUrl} alt={displayName} draggable={false} />
               {renderOverlay()}
             </div>
+          )}
 
-            {numPages > 1 && (
-              <div className="viewer-pdf-nav">
+          {isPdf && (
+            <div className="viewer-pdf-wrap">
+              <div className="annotation-stage">
+                <Document
+                  file={viewUrl}
+                  onLoadSuccess={handleDocumentLoadSuccess}
+                  loading={<p className="viewer-pdf-status">Betöltés...</p>}
+                  error={<p className="viewer-pdf-status">A PDF nem tölthető be</p>}
+                >
+                  {/* text/annotation layer nélkül, mert azok a canvas fölé kerülnek és
+                      elnyelnék a kattintásokat az annotation-overlay elől */}
+                  <Page
+                    pageNumber={currentPage}
+                    width={pageWidth}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                  />
+                </Document>
+                {renderOverlay()}
+              </div>
+
+              {numPages > 1 && (
+                <div className="viewer-pdf-nav">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => changePage(-1)}
+                  >
+                    &larr; Előző
+                  </button>
+                  <span>
+                    {currentPage} / {numPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={currentPage >= numPages}
+                    onClick={() => changePage(1)}
+                  >
+                    Következő &rarr;
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isImage && !isPdf && (
+            <div className="viewer-fallback">
+              <p>Ez a fájltípus nem jeleníthető meg</p>
+              <a className="btn btn-primary btn-sm" href={downloadUrl}>
+                Letöltés
+              </a>
+            </div>
+          )}
+        </main>
+
+        <aside className="viewer-sidebar">
+          {readonly ? (
+            <div className="sidebar-section">
+              <h3 className="sidebar-title">
+                Megjegyzések{annotations.length > 0 ? ` (${annotations.length})` : ''}
+              </h3>
+              {renderCommentList(false)}
+              {versionData?.feedback && (
+                <p className="sidebar-hint">{versionData.feedback}</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="sidebar-section sidebar-decision">
+                {annotations.length === 0 ? (<button
+                  type="button"
+                  className={`sidebar-decision-btn sidebar-decision-btn--accept${decision === 'accept' ? ' active' : ''}`}
+                  onClick={() => setDecision('accept')}
+                  disabled={sent}
+                >
+                  ✓ Elfogadás
+                </button>) : (<button
+                  type="button"
+                  className={`sidebar-decision-btn sidebar-decision-btn--accept${decision === 'accept' ? ' active' : ''}`}
+                  onClick={() => setDecision('accept')}
+                  disabled={true}
+                >
+                  ✓ Elfogadás
+                </button>)}
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={currentPage <= 1}
-                  onClick={() => changePage(-1)}
+                  className={`sidebar-decision-btn sidebar-decision-btn--feedback${decision === 'feedback' ? ' active' : ''}`}
+                  onClick={() => setDecision('feedback')}
+                  disabled={sent}
                 >
-                  &larr; Előző
-                </button>
-                <span>
-                  {currentPage} / {numPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={currentPage >= numPages}
-                  onClick={() => changePage(1)}
-                >
-                  Következő &rarr;
+                  ✎ Visszajelzés
                 </button>
               </div>
-            )}
-          </div>
-        )}
 
-        {!isImage && !isPdf && (
-          <div className="viewer-fallback">
-            <p>Ez a fájltípus nem jeleníthető meg</p>
-            <a className="btn btn-primary btn-sm" href={downloadUrl}>
-              Letöltés
-            </a>
-          </div>
-        )}
-      </main>
+              {decision === 'feedback' && !sent && (
+                <div className="sidebar-section sidebar-comments">
+                  <h3 className="sidebar-title">
+                    Megjegyzések{annotations.length > 0 ? ` (${annotations.length})` : ''}
+                  </h3>
+                  {renderCommentList(true)}
+
+                  {showGeneralNote ? (
+                    <div className="field">
+                      <label className="field-label">Egyéb visszajelzés</label>
+                      <textarea
+                        className="input textarea sidebar-general-textarea"
+                        rows={4}
+                        autoFocus
+                        placeholder="Bármilyen általános megjegyzés, pl. határidő..."
+                        value={generalNote}
+                        onChange={(e) => setGeneralNote(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm sidebar-general-toggle"
+                      onClick={() => setShowGeneralNote(true)}
+                    >
+                      + Egyéb visszajelzés
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {decision === 'accept' && !sent && (
+                <div className="sidebar-section">
+                  <p className="sidebar-hint">
+                    A verzió jóváhagyásra kerül. Ha mégis van észrevétele, válassza a Visszajelzés opciót.
+                  </p>
+                </div>
+              )}
+
+              <div className="sidebar-footer">
+                {sendError && <p className="sidebar-error">{sendError}</p>}
+                {sent ? (
+                  <>
+                    <p className="sidebar-success">Köszönjük, a visszajelzés elküldve!</p>
+                    <button type="button" className="btn btn-secondary" onClick={() => window.close()}>
+                      Bezárás
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSend}
+                    disabled={!canSend || sending}
+                  >
+                    {sending ? 'Küldés...' : 'Küldés'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
     </div>
   )
 }
