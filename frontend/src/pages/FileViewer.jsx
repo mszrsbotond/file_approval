@@ -28,6 +28,35 @@ function CommentIcon() {
   )
 }
 
+function FileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+      <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+    </svg>
+  )
+}
+
+function ArrowLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="m12 8-4 4 4 4" />
+      <path d="M16 12H8" />
+    </svg>
+  )
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="m12 16 4-4-4-4" />
+      <path d="M8 12h8" />
+    </svg>
+  )
+}
+
 function FileViewer() {
   const { orderId, versionId, filename: encodedFilename } = useParams()
   const [searchParams] = useSearchParams()
@@ -59,11 +88,16 @@ function FileViewer() {
   const [decision, setDecision] = useState(null) // null | 'accept' | 'feedback'
   const [showGeneralNote, setShowGeneralNote] = useState(false)
   const [generalNote, setGeneralNote] = useState('')
+  const [attachments, setAttachments] = useState([])
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [sendError, setSendError] = useState(null)
 
   const [versionData, setVersionData] = useState(null)
+
+  // Az ügyfél által a visszajelzéshez csatolt fájlok — csak adminnak (readonly),
+  // mert a /response-files végpontok admin-session-t igényelnek.
+  const [responseFiles, setResponseFiles] = useState([])
 
   // A verzióhoz tartozó összes fájl, hogy a fejlécben lehessen köztük váltani
   // (egy verzióben egyszerre több fájl is érkezhet, nem csak az, amivel a
@@ -127,6 +161,31 @@ function FileViewer() {
       cancelled = true
     }
   }, [orderId, versionId, filename])
+
+  useEffect(() => {
+    if (!readonly) return
+    let cancelled = false
+
+    const fetchResponseFiles = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/orders/${orderId}/versions/${versionId}/response-files`,
+          { credentials: 'include' },
+        )
+        if (response.ok && !cancelled) {
+          const data = await response.json()
+          setResponseFiles(data.files)
+        }
+      } catch (error) {
+        // hiba esetén a lista üresen marad
+      }
+    }
+
+    fetchResponseFiles()
+    return () => {
+      cancelled = true
+    }
+  }, [orderId, versionId, readonly])
 
   // Ha egy pin aktívvá válik, görgessük láthatóvá az oldalsávban.
   useEffect(() => {
@@ -314,6 +373,7 @@ function FileViewer() {
     const formData = new FormData()
     formData.append('status', status)
     formData.append('message', generalNote.trim())
+    attachments.forEach((file) => formData.append('files', file))
 
     try {
       const response = await fetch(`${API_BASE}/review/${orderId}/${versionId}/feedback`, {
@@ -437,7 +497,7 @@ function FileViewer() {
                 disabled={currentFileIndex <= 0}
                 aria-label="Előző fájl"
               >
-                &larr;
+                <ArrowLeftIcon />
               </button>
               <span>
                 {currentFileIndex + 1} / {allFiles.length} fájl
@@ -449,7 +509,7 @@ function FileViewer() {
                 disabled={currentFileIndex >= allFiles.length - 1}
                 aria-label="Következő fájl"
               >
-                &rarr;
+                <ArrowRightIcon />
               </button>
             </div>
           )}
@@ -499,7 +559,7 @@ function FileViewer() {
                     disabled={currentPage <= 1}
                     onClick={() => changePage(-1)}
                   >
-                    &larr; Előző
+                    <ArrowLeftIcon /> Előző
                   </button>
                   <span>
                     {currentPage} / {numPages}
@@ -510,7 +570,7 @@ function FileViewer() {
                     disabled={currentPage >= numPages}
                     onClick={() => changePage(1)}
                   >
-                    Következő &rarr;
+                    Következő <ArrowRightIcon />
                   </button>
                 </div>
               )}
@@ -539,6 +599,30 @@ function FileViewer() {
                   <CommentIcon />
                   {versionData.feedback}
                 </p>
+              )}
+              {responseFiles.length > 0 && (
+                <>
+                  <h3
+                    className="sidebar-title sidebar-attachments-title"
+                    title="Ügyfél által csatolt fájlok"
+                    aria-label="Ügyfél által csatolt fájlok"
+                  >
+                    <FileIcon />
+                  </h3>
+                  <ul className="sidebar-attachment-list">
+                    {responseFiles.map((file) => (
+                      <li key={file}>
+                        <a
+                          href={`${API_BASE}/orders/${orderId}/versions/${versionId}/response-files/${encodeURIComponent(file)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {file.includes('_') ? file.split('_').slice(1).join('_') : file}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
           ) : (
@@ -591,6 +675,23 @@ function FileViewer() {
                       + Egyéb visszajelzés
                     </button>
                   )}
+
+                  <div className="field sidebar-attachments">
+                    <label className="field-label">Fájlok csatolása (opcionális)</label>
+                    <input
+                      type="file"
+                      className="file-input"
+                      multiple
+                      onChange={(e) => setAttachments(Array.from(e.target.files))}
+                    />
+                    {attachments.length > 0 && (
+                      <ul className="sidebar-attachment-list">
+                        {attachments.map((file, index) => (
+                          <li key={`${file.name}-${index}`}>{file.name}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
 

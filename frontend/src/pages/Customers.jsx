@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout.jsx'
 
 function Customers() {
@@ -32,14 +33,19 @@ function Customers() {
           {customers.length === 0 && <p className="entity-empty">Még nincs ügyfél</p>}
           <ul className="entity-list">
             {customers.map((customer) => (
-              <li key={customer.customer_id} className="customer-row">
-                <div className="customer-row-main">
-                  <span className="customer-row-name">{customer.name}</span>
-                  <span className="customer-row-email">{customer.email}</span>
-                </div>
-                <span className="customer-row-count">
-                  {customer.order_count} rendelés
-                </span>
+              <li key={customer.customer_id}>
+                <Link
+                  to={`/admin?customer_id=${customer.customer_id}&customer_name=${encodeURIComponent(customer.name)}`}
+                  className="customer-row"
+                >
+                  <div className="customer-row-main">
+                    <span className="customer-row-name">{customer.name}</span>
+                    <span className="customer-row-email">{customer.email}</span>
+                  </div>
+                  <span className="customer-row-count">
+                    {customer.order_count} rendelés
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

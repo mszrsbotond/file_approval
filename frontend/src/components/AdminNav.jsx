@@ -24,6 +24,12 @@ function AdminNav() {
         >
           Ügyfelek
         </NavLink>
+        <NavLink
+          to="/admin/archives"
+          className={({ isActive }) => `admin-nav-link${isActive ? ' admin-nav-link--active' : ''}`}
+        >
+          Archívum
+        </NavLink>
       </nav>
     </aside>
   )

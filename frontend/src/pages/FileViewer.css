@@ -50,8 +50,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -368,6 +368,25 @@
 
 .sidebar-general-textarea {
   min-height: 80px;
+}
+
+.sidebar-attachments {
+  margin-top: 14px;
+}
+
+.sidebar-attachments-title {
+  margin-top: 16px;
+}
+
+.sidebar-attachment-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .sidebar-hint {

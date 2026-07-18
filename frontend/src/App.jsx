@@ -3,6 +3,7 @@ import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import CreateOrder from './pages/CreateOrder.jsx'
 import Customers from './pages/Customers.jsx'
+import Archives from './pages/Archives.jsx'
 import OrderDetail from './pages/OrderDetail.jsx'
 import ReviewPage from './pages/ReviewPage.jsx'
 import FileViewer from './pages/FileViewer.jsx'
@@ -15,6 +16,7 @@ function App() {
         <Route path="/admin" element={<Dashboard />} />
         <Route path="/admin/new-order" element={<CreateOrder />} />
         <Route path="/admin/customers" element={<Customers />} />
+        <Route path="/admin/archives" element={<Archives />} />
         <Route path="/admin/orders/:orderId" element={<OrderDetail />} />
         <Route path="/review/:orderId/:versionId" element={<ReviewPage />} />
         <Route path="/viewer/:orderId/:versionId/:filename" element={<FileViewer />} />

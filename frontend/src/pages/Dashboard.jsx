@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout.jsx'
 
 function KanbanColumn({ title, orders, className }) {
@@ -15,8 +15,8 @@ function KanbanColumn({ title, orders, className }) {
                 <span className="order-row-product">{order.product_name}</span>
               </div>
               <div className="order-row-details">
+                <span>{order.order_number}</span>
                 <span>{order.customer_name}</span>
-                <span>{order.customer_email}</span>
                 <span>{order.created_at}</span>
               </div>
             </Link>
@@ -28,18 +28,25 @@ function KanbanColumn({ title, orders, className }) {
 }
 
 function Dashboard() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [customers, setCustomers] = useState([])
   const [orders, setOrders] = useState([])
+  const [searchInput, setSearchInput] = useState('')
+  // Ha az Ügyfelek oldalról érkeztünk egy ügyfélre kattintva, a keresőmező az ő
+  // nevét mutatja, de a szűrés pontos customer_id egyezésen alapul, nem szövegen —
+  // amint a felhasználó átírja a mezőt, visszaáll a normál cím/rendelésszám keresésre.
+  const [customerIdFilter, setCustomerIdFilter] = useState(null)
 
-  const [customerFilter, setCustomerFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [searchFilter, setSearchFilter] = useState('')
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/orders', { credentials: 'include' })
+      if (response.ok) setOrders(await response.json())
+    } catch (error) {
+      // ignore
+    }
+  }
 
-  const [approvedOrders, setApprovedOrders] = useState([])
-  const [changesOrders, setChangesOrders] = useState([])
-  const [pendingOrders, setPendingOrders] = useState([])
-
-  const fetchCustomers = async () => {
+    const fetchCustomers = async () => {
     try {
       const response = await fetch('http://localhost:8000/customers', {
         credentials: 'include',
@@ -52,47 +59,55 @@ function Dashboard() {
     }
   }
 
-  const fetchOrders = async () => {
-    try {
-      const params = new URLSearchParams()
-      if (customerFilter) params.set('customer_id', customerFilter)
-      if (statusFilter) params.set('status', statusFilter)
-      if (searchFilter) params.set('q', searchFilter)
-
-      const response = await fetch(
-        `http://localhost:8000/orders${params.toString() ? `?${params}` : ''}`,
-        { credentials: 'include' },
-      )
-      if (response.ok) {
-        const responseContent = await response.json()
-        setOrders(responseContent)
-        setApprovedOrders(responseContent.filter((order) => order.status === 'approved'))
-        setChangesOrders(responseContent.filter((order) => order.status === 'changes_requested'))
-        setPendingOrders(responseContent.filter((order) => order.status === 'pending'))
-      }
-    } catch (error) {
-      // ignore, list just stays empty
-    }
-  }
-
   useEffect(() => {
     fetchCustomers()
+    fetchOrders()
   }, [])
 
   useEffect(() => {
-    fetchOrders()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerFilter, statusFilter, searchFilter])
+    const customerId = searchParams.get('customer_id')
+    const customerName = searchParams.get('customer_name')
+    if (customerId) {
+      setCustomerIdFilter(customerId)
+      setSearchInput(customerName || '')
+    }
+  }, [searchParams])
+
+  const handleSearchChange = (e) => {
+    setSearchInput(e.target.value)
+    if (customerIdFilter) {
+      setCustomerIdFilter(null)
+      setSearchParams({}, { replace: true })
+    }
+  }
+
+  const q = searchInput.trim().toLowerCase()
+  const filtered = customerIdFilter
+    ? orders.filter((o) => o.customer_id === customerIdFilter)
+    : q
+    ? orders.filter((o) =>
+        [o.product_name, o.order_number].some((f) => f?.toLowerCase().includes(q)),
+      )
+    : orders
+
+  const byStatus = (s) => filtered.filter((o) => o.status === s)
 
   return (
     <AdminLayout wide>
       <div className="app-header">
         <h1 className="app-title">Rendelések</h1>
       </div>
+      <input
+        type="text"
+        className="searchBar"
+        placeholder="Keresés..."
+        value={searchInput}
+        onChange={handleSearchChange}
+      />
       <div className="cards-kanban">
-        <KanbanColumn title="Jóváhagyásra vár" orders={pendingOrders} className="kanban-column--pending" />
-        <KanbanColumn title="Javítás Kérve" orders={changesOrders} className="kanban-column--changes" />
-        <KanbanColumn title="Jóváhagyva" orders={approvedOrders} className="kanban-column--approved" />
+        <KanbanColumn title="Jóváhagyásra vár" orders={byStatus('pending')} className="kanban-column--pending" />
+        <KanbanColumn title="Javítás Kérve" orders={byStatus('changes_requested')} className="kanban-column--changes" />
+        <KanbanColumn title="Jóváhagyva" orders={byStatus('approved')} className="kanban-column--approved" />
       </div>
     </AdminLayout>
   )

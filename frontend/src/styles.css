@@ -192,6 +192,65 @@ a:hover {
   margin: 0;
 }
 
+.app-title-editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  color: inherit;
+}
+
+.app-title-editable svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.app-title-editable:hover {
+  background: var(--color-surface-hover, rgba(79, 70, 229, 0.08));
+}
+
+.app-title-editable:hover svg {
+  color: var(--color-primary);
+}
+
+.app-title-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-title-edit-input {
+  font-size: 20px;
+  font-weight: 600;
+  max-width: 420px;
+}
+
+.app-header-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.archive-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.archived-banner {
+  margin: 4px 0 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--color-pending-soft, #fef3c7);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
 .app-subtitle {
   margin: 0;
   color: var(--color-text-muted);
@@ -218,6 +277,37 @@ a:hover {
 }
 
 /* Kanban dashboard */
+
+.searchBar {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 560px;
+  padding: 11px 16px 11px 40px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239c9db3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  background-size: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.searchBar::placeholder {
+  color: var(--color-text-faint);
+}
+
+.searchBar:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
 
 .cards-kanban {
   display: grid;
@@ -499,6 +589,21 @@ a:hover {
   min-width: 180px;
 }
 
+.order-row--archived {
+  gap: 12px;
+}
+
+.order-row-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
 /* Customer list */
 
 .customer-row {
@@ -510,6 +615,14 @@ a:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.customer-row:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  text-decoration: none;
 }
 
 .customer-row-main {

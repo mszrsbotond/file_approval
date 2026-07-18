@@ -12,6 +12,7 @@ function CreateOrder() {
   const [customerName, setCustomerName] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
   const [productName, setProductName] = useState('')
+  const [orderNumber, setOrderNumber] = useState('')
   const [creatingOrder, setCreatingOrder] = useState(false)
   const [orderMessage, setOrderMessage] = useState('')
 
@@ -51,8 +52,8 @@ function CreateOrder() {
         },
         body: JSON.stringify(
           isNewCustomer
-            ? { name: customerName, email: customerEmail, product_name: productName }
-            : { customer_id: selectedCustomerId, product_name: productName }
+            ? { name: customerName, email: customerEmail, order_number: orderNumber, product_name: productName }
+            : { customer_id: selectedCustomerId, order_number: orderNumber, product_name: productName }
         ),
       })
 
@@ -129,6 +130,16 @@ function CreateOrder() {
                 placeholder="Termék neve"
                 value={productName}
                 onChange={(event) => setProductName(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="field-label">Táskaszám</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Termék neve"
+                value={orderNumber}
+                onChange={(event) => setOrderNumber(event.target.value)}
               />
             </div>
             <button

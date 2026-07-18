@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import AdminLayout from '../components/AdminLayout.jsx'
 
 function EyeIcon() {
@@ -19,8 +19,28 @@ function CommentIcon() {
   )
 }
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
+  )
+}
+
+function ArchiveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="5" rx="1" />
+      <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+      <path d="M10 12h4" />
+    </svg>
+  )
+}
+
 function OrderDetail() {
   const { orderId } = useParams()
+  const navigate = useNavigate()
+  const [archiving, setArchiving] = useState(false)
 
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -30,6 +50,9 @@ function OrderDetail() {
   const [chosenEmailMessage, setChosenEmailMessage] = useState("")
 
   const [order, setOrder] = useState(null)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleInput, setTitleInput] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
 
   const [versions, setVersions] = useState([])
   const [versionFiles, setVersionFiles] = useState({})
@@ -104,6 +127,73 @@ function OrderDetail() {
     }
   }
 
+  const startEditingTitle = () => {
+    setTitleInput(order?.product_name || '')
+    setEditingTitle(true)
+  }
+
+  const cancelEditingTitle = () => {
+    setEditingTitle(false)
+  }
+
+  const saveTitle = async () => {
+    const trimmed = titleInput.trim()
+    if (!trimmed || trimmed === order?.product_name) {
+      setEditingTitle(false)
+      return
+    }
+
+    setSavingTitle(true)
+    try {
+      const response = await fetch(`http://localhost:8000/orders/${orderId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ product_name: trimmed }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setOrder((prev) => (prev ? { ...prev, product_name: data.product_name } : prev))
+        setEditingTitle(false)
+      }
+    } catch (error) {
+      // hiba esetén a szerkesztés nyitva marad
+    } finally {
+      setSavingTitle(false)
+    }
+  }
+
+  const toggleArchive = async () => {
+    if (!order) return
+    const nextArchived = !order.archived
+    if (nextArchived && !window.confirm('Biztosan archiválja ezt a rendelést? A dashboardon nem fog megjelenni.')) {
+      return
+    }
+
+    setArchiving(true)
+    try {
+      const response = await fetch(`http://localhost:8000/orders/${orderId}/archive`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ archived: nextArchived }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setOrder((prev) => (prev ? { ...prev, archived: data.archived } : prev))
+        if (nextArchived) navigate('/admin')
+      }
+    } catch (error) {
+      // hiba esetén az archiválás állapota változatlan marad
+    } finally {
+      setArchiving(false)
+    }
+  }
+
   const handleFileChange = (event) => {
     setFiles(Array.from(event.target.files))
   }
@@ -154,15 +244,56 @@ function OrderDetail() {
           &larr; Vissza a rendelésekhez
         </Link>
 
-        <div className="app-header">
-          <h1 className="app-title">{order?.product_name}</h1>
-          <p className="app-subtitle">Rendelés azonosító: {orderId}</p>
+        <div className="app-header app-header-row">
+          {editingTitle ? (
+            <div className="app-title-edit">
+              <input
+                type="text"
+                className="input app-title-edit-input"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                autoFocus
+                disabled={savingTitle}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveTitle()
+                  if (e.key === 'Escape') cancelEditingTitle()
+                }}
+              />
+              <button className="btn btn-primary" onClick={saveTitle} disabled={savingTitle || !titleInput.trim()}>
+                Mentés
+              </button>
+              <button className="btn btn-secondary" onClick={cancelEditingTitle} disabled={savingTitle}>
+                Mégse
+              </button>
+            </div>
+          ) : (
+            <h1 className="app-title app-title-editable" onClick={startEditingTitle} title="Cím szerkesztése">
+              {order?.product_name}
+              <EditIcon />
+            </h1>
+          )}
+
+          {order && !editingTitle && (
+            <button
+              className="btn btn-secondary archive-toggle-btn"
+              onClick={toggleArchive}
+              disabled={archiving}
+              title={order.archived ? 'Visszaállítás az aktív rendelések közé' : 'Rendelés archiválása'}
+            >
+              <ArchiveIcon />
+              {order.archived ? 'Visszaállítás' : 'Archiválás'}
+            </button>
+          )}
         </div>
+
+        {order?.archived && (
+          <p className="archived-banner">Ez a rendelés archiválva van, nem jelenik meg a dashboardon.</p>
+        )}
 
         {order && (
           <div className="card">
             <ul className="info-list">
-              <li><span>Rendelésszám</span><span>{order.order_number}</span></li>
+              <li><span>Táskaszám</span><span>{order.order_number}</span></li>
               <li><span>Megrendelő</span><span>{order.customer_name}</span></li>
               <li><span>E-mail</span><span>{order.customer_email}</span></li>
               <li><span>Létrehozva</span><span>{order.created_at}</span></li>

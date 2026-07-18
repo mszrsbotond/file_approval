@@ -117,10 +117,16 @@ class DBManager():
             VALUES(%s, %s, %s, %s)
         """
         return self.connection.execute_write_query(query, (order_id, customer_id, order_number, product_name))
-    
-    def get_orders(self, customer_id=None, status=None, search=None):
-        conditions = []
-        params = []
+
+    def update_order_product_name(self, order_id, product_name):
+        query = """
+            UPDATE orders SET product_name = %s WHERE order_id = %s
+        """
+        return self.connection.execute_write_query(query, (product_name, order_id))
+
+    def get_orders(self, customer_id=None, status=None, search=None, archived=False):
+        conditions = ["o.archived = %s"]
+        params = [archived]
 
         if customer_id:
             conditions.append("o.customer_id = %s")
@@ -131,12 +137,13 @@ class DBManager():
             like = f"%{search}%"
             params.extend([like, like])
 
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where_clause = f"WHERE {' AND '.join(conditions)}"
 
         query = f"""
             SELECT o.order_id, o.customer_id, o.order_number, o.product_name, o.created_at,
                    c.name, c.email,
-                   COALESCE(latest.status, 'pending') AS status
+                   COALESCE(latest.status, 'pending') AS status,
+                   o.archived
             FROM orders o
             JOIN customers c ON c.customer_id = o.customer_id
             LEFT JOIN LATERAL (
@@ -189,13 +196,19 @@ class DBManager():
     def get_order_by_id(self, order_id):
         query = """
             SELECT o.order_id, o.customer_id, o.order_number, o.product_name, o.created_at,
-                   c.name, c.email
+                   c.name, c.email, o.archived
             FROM orders o
             JOIN customers c ON c.customer_id = o.customer_id
             WHERE o.order_id = %s
         """
         rows = self.connection.execute_read_query(query, (order_id,))
         return rows[0] if rows else None
+
+    def set_order_archived(self, order_id, archived):
+        query = """
+            UPDATE orders SET archived = %s WHERE order_id = %s
+        """
+        return self.connection.execute_write_query(query, (archived, order_id))
 
     def get_version_by_id(self, version_id):
         query = """
@@ -394,6 +407,7 @@ class NewOrderRequest(BaseModel):
     customer_id: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
+    order_number: str
     product_name: str
 
 @app.get("/customers")
@@ -409,9 +423,10 @@ def list_orders(
     customer_id: Optional[str] = None,
     status: Optional[str] = None,
     q: Optional[str] = None,
+    archived: bool = False,
     _: None = Depends(require_auth),
 ):
-    orders = DBMan.get_orders(customer_id=customer_id, status=status, search=q)
+    orders = DBMan.get_orders(customer_id=customer_id, status=status, search=q, archived=archived)
     return [
         {
             "order_id": row[0],
@@ -422,6 +437,7 @@ def list_orders(
             "customer_name": row[5],
             "customer_email": row[6],
             "status": row[7],
+            "archived": row[8],
         }
         for row in orders
     ]
@@ -436,16 +452,13 @@ def add_order(payload: NewOrderRequest, _: None = Depends(require_auth)):
         DBMan.add_customer(customer_id, payload.name, payload.email)
 
     order_id = str(uuid.uuid4())
-    next_number = DBMan.count_orders() + 1
-    order_number = f"{next_number:04d}"
 
-    rows_affected = DBMan.add_order(order_id, customer_id, order_number, payload.product_name)
+    rows_affected = DBMan.add_order(order_id, customer_id, payload.order_number, payload.product_name)
     if not rows_affected:
         raise HTTPException(status_code=400, detail="A rendelés létrehozása sikertelen, ellenőrizze az ügyfél azonosítót")
 
     return {
         "order_id": order_id,
-        "order_number": order_number,
     }
 
 
@@ -463,7 +476,41 @@ def get_order(order_id: str, _: None = Depends(require_auth)):
         "created_at": order[4],
         "customer_name": order[5],
         "customer_email": order[6],
+        "archived": order[7],
     }
+
+
+class UpdateOrderRequest(BaseModel):
+    product_name: str
+
+
+@app.patch("/orders/{order_id}")
+def update_order(order_id: str, payload: UpdateOrderRequest, _: None = Depends(require_auth)):
+    if not payload.product_name.strip():
+        raise HTTPException(status_code=400, detail="A cím nem lehet üres")
+
+    order = DBMan.get_order_by_id(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="A rendelés nem található")
+
+    DBMan.update_order_product_name(order_id, payload.product_name.strip())
+
+    return {"order_id": order_id, "product_name": payload.product_name.strip()}
+
+
+class ArchiveOrderRequest(BaseModel):
+    archived: bool
+
+
+@app.patch("/orders/{order_id}/archive")
+def archive_order(order_id: str, payload: ArchiveOrderRequest, _: None = Depends(require_auth)):
+    order = DBMan.get_order_by_id(order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="A rendelés nem található")
+
+    DBMan.set_order_archived(order_id, payload.archived)
+
+    return {"order_id": order_id, "archived": payload.archived}
     
     
 
